@@ -5,9 +5,29 @@ import java.util.*;
 import java.io.*;
 
 class Board {
+	class BoardRunnable implements Runnable {
+		Board b, solve;
+
+		public BoardRunnable(Board b){
+			this.b = b;
+			this.solve = null;
+		}
+
+		@Override
+		public void run(){
+			control.rmThread();
+			if(b == null) return;
+			this.solve = b.solve();
+			control.addThread();
+		}
+	}
+
 	public List<Cell> cells = new LinkedList<Cell>();
 
-	public Board(String file) {
+	Control control;
+
+	public Board(String file, Control control) {
+		this.control = control;
 		try{
 			InputStream in;
 			in = new FileInputStream(file);
@@ -34,7 +54,8 @@ class Board {
 		}
 	}
 
-	public Board ( List<Cell> cells ) {
+	public Board ( List<Cell> cells, Control control ) {
+		this.control = control;
 		this.cells = new LinkedList<Cell>(cells);
 	}
 
@@ -61,7 +82,7 @@ class Board {
 		Cell c = new Cell(row, col, val);
 		cs.add(c);
 
-		return new Board(cs);
+		return new Board(cs, control);
 	}
 
 	public Board solve(){
@@ -78,13 +99,38 @@ class Board {
 		}
 
 		int i;
+		Thread th[] = new Thread[10];
+		BoardRunnable br[] = new BoardRunnable[10];
 		for(i = 0; i <= 9; i++){
 			Board solution = this.add(unset.row(), unset.col(), i);
 			if( solution != null ){
-				Board solve = solution.solve();
-				if( solve != null ){
-					return solve;
+				if(control.leftThread() > 0){
+					br[i] = new BoardRunnable(solution);
+					th[i] = new Thread(br[i]);
+					th[i].start();
+				} else {
+					Board solve = solution.solve();
+					if( solve != null ){
+						return solve;
+					}
 				}
+			}
+		}
+
+		for(i = 0; i <= 9; i++){
+			if(th[i] == null) {
+				break;
+			}
+
+
+			try{
+				th[i].join();
+				if(br[i].solve == null){
+					break;
+				}
+				return br[i].solve;
+			} catch (InterruptedException e){
+				e.printStackTrace();
 			}
 		}
 
